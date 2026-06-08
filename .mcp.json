@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "yc-toolkit": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yandex-cloud/mcp", "-s", "toolkit", "-p", "aivanov-granted"]
+    },
+    "yc-docs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@yandex-cloud/mcp", "-s", "docs", "-p", "aivanov-granted"]
+    }
+  }
+}
