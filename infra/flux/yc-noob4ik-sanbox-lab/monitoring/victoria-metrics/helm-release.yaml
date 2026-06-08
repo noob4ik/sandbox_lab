@@ -1,0 +1,171 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vm-stack
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: victoria-metrics-k8s-stack
+      version: ">=0.25.0 <1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: victoriametrics
+        namespace: monitoring
+      interval: 1h
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  dependsOn: []
+  valuesFrom: []
+  values:
+    # Inline overrides — heavy config lives in values.yaml
+    # To use external values file, add a ConfigMap/Secret via valuesFrom:
+    # valuesFrom:
+    #   - kind: ConfigMap
+    #     name: vm-stack-values
+    #     valuesKey: values.yaml
+
+    vmsingle:
+      enabled: true
+      spec:
+        retentionPeriod: "30d"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        storage:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+
+    vmcluster:
+      enabled: false
+
+    vmagent:
+      enabled: true
+      spec:
+        scrapeInterval: "30s"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+    vmalert:
+      enabled: true
+      spec:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+    alertmanager:
+      enabled: true
+      spec:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      config:
+        global:
+          resolve_timeout: 5m
+        route:
+          group_by: ["alertname", "namespace"]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 12h
+          receiver: "blackhole"
+        receivers:
+          - name: "blackhole"
+
+    grafana:
+      enabled: true
+      adminUser: admin
+      # Use an existing Secret instead of plain text:
+      # adminPassword is set via adminPasswordSecretKeyRef below
+      adminPassword: changeme
+      # adminPasswordSecretKeyRef:
+      #   name: grafana-admin-secret
+      #   key: password
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 300m
+          memory: 512Mi
+      persistence:
+        enabled: true
+        size: 2Gi
+        accessModes:
+          - ReadWriteOnce
+      service:
+        type: ClusterIP
+        port: 80
+      sidecar:
+        dashboards:
+          enabled: true
+          label: grafana_dashboard
+          labelValue: "1"
+        datasources:
+          enabled: true
+
+    prometheus-node-exporter:
+      enabled: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 30Mi
+        limits:
+          cpu: 100m
+          memory: 60Mi
+
+    kube-state-metrics:
+      enabled: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    defaultRules:
+      create: true
+
+    kubelet:
+      enabled: true
+    kubeApiServer:
+      enabled: true
+    kubeControllerManager:
+      enabled: true
+    kubeScheduler:
+      enabled: true
+    kubeEtcd:
+      enabled: true
+    kubeProxy:
+      enabled: true
+    coreDns:
+      enabled: true

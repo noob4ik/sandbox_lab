@@ -1,0 +1,213 @@
+# victoria-metrics-k8s-stack Helm values
+# Chart: https://github.com/VictoriaMetrics/helm-charts/tree/master/charts/victoria-metrics-k8s-stack
+# helm repo add vm https://victoriametrics.github.io/helm-charts/
+# helm install vm-stack vm/victoria-metrics-k8s-stack -n monitoring --create-namespace -f values.yaml
+
+# ── Victoria Metrics Single-node (VMSingle) ──────────────────────────────────
+# Use VMSingle for homelab (simpler than VMCluster)
+vmsingle:
+  enabled: true
+  spec:
+    retentionPeriod: "30d"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    storage:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+
+# ── VMCluster (disabled — use VMSingle for homelab) ──────────────────────────
+vmcluster:
+  enabled: false
+
+# ── VMAgent ──────────────────────────────────────────────────────────────────
+vmagent:
+  enabled: true
+  spec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    # Scrape interval
+    scrapeInterval: "30s"
+    # Additional scrape configs can be added here
+    # externalLabels:
+    #   cluster: yc-noob4ik-sanbox-lab
+
+# ── VMAlert ──────────────────────────────────────────────────────────────────
+vmalert:
+  enabled: true
+  spec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ── Alertmanager ─────────────────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+  spec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  # Basic config — replace receivers as needed
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: "blackhole"
+    receivers:
+      - name: "blackhole"
+    # Example Telegram receiver (uncomment and configure):
+    # receivers:
+    #   - name: telegram
+    #     telegram_configs:
+    #       - bot_token: "<BOT_TOKEN>"
+    #         chat_id: <CHAT_ID>
+    #         parse_mode: HTML
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  # Default admin credentials — change in production or use secrets
+  adminUser: admin
+  adminPassword: changeme
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+  # Persistence for dashboards/plugins
+  persistence:
+    enabled: true
+    size: 2Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Gateway API HTTPRoute (instead of classic Ingress)
+  # Uncomment and adjust when Gateway API is set up in the cluster
+  # ingress:
+  #   enabled: true
+  #   ingressClassName: ""
+  #   annotations:
+  #     gateway.networking.k8s.io/v1: "true"
+  #   hosts:
+  #     - grafana.example.local
+  #   tls: []
+
+  # Access via port-forward:
+  # kubectl port-forward svc/vm-stack-grafana 3000:80 -n monitoring
+  service:
+    type: ClusterIP
+    port: 80
+
+  # Sidecar to auto-load dashboards from ConfigMaps
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+    datasources:
+      enabled: true
+
+  # Pre-configured VictoriaMetrics datasource is added automatically by the chart
+  additionalDataSources: []
+
+# ── Node Exporter ─────────────────────────────────────────────────────────────
+prometheus-node-exporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 30Mi
+    limits:
+      cpu: 100m
+      memory: 60Mi
+
+# ── Kube State Metrics ────────────────────────────────────────────────────────
+kube-state-metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# ── Default scrape rules (Kubernetes) ────────────────────────────────────────
+# Enables built-in scrape configs for k8s components
+defaultRules:
+  create: true
+  rules:
+    etcd: true
+    general: true
+    k8s: true
+    kubeApiserver: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubeControllerManager: true
+    kubelet: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: true
+    kubeSchedulerRecording: true
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+
+# ── Kubernetes component scraping ────────────────────────────────────────────
+kubelet:
+  enabled: true
+
+kubeApiServer:
+  enabled: true
+
+kubeControllerManager:
+  enabled: true
+
+kubeScheduler:
+  enabled: true
+
+kubeEtcd:
+  enabled: true
+
+kubeProxy:
+  enabled: true
+
+coreDns:
+  enabled: true
